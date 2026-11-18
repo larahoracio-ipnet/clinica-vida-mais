@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from backend.app.api.routes_guias import router as guias_router
 from backend.app.core.config import get_settings
 
 settings = get_settings()
@@ -18,6 +18,8 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "X-User-Role"],
 )
+
+app.include_router(guias_router)
 
 @app.get("/health")
 def health():
