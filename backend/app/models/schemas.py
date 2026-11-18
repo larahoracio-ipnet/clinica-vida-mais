@@ -20,7 +20,7 @@ class PerfilUsuario(str, Enum):
 # ==============================================================================
 
 try:
-    from ia_ocr_rag.core.schemas import (
+    from ia_ocr_rag.core.schemas import (   # type: ignore[import-not-found]
         GuiaProcessadaOutput,
         GuiaProcessamentoRequest,
         MetodoCorrecaoTUSS,
