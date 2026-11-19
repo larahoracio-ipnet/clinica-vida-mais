@@ -31,6 +31,8 @@ credentials*.json
 # ARTEFATOS TEMPORÁRIOS DE PROCESSAMENTO LOCAL
 # ==============================================================================
 ia_ocr_rag/data/output_json/individual/*.json
+# Extração bruta do OCR (contém PII em claro, uso local para medir acurácia)
+ia_ocr_rag/data/output_json/ocr_bruto/
 !ia_ocr_rag/data/output_json/.gitkeep
 
 # ==============================================================================
