@@ -38,7 +38,7 @@ class GuiaProcessamentoRequest(BaseModel):
 
 
 # ==============================================================================
-# 2. CONTRATO DE EXTRAÇÃO BRUTA DO OCR (Gemini 2.5 Flash Structured Output)
+# 2. CONTRATO DE EXTRAÇÃO BRUTA DO OCR (Gemini 3.8 Flash Structured Output)
 # ==============================================================================
 class ProcedimentoOCRRaw(BaseModel):
     sequencial_item: int = Field(..., description="Número sequencial do procedimento na guia (1, 2, 3...).")
