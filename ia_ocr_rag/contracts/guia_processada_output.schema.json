@@ -1,0 +1,365 @@
+{
+  "$defs": {
+    "MetodoCorrecaoTUSS": {
+      "description": "Classifica a estratégia lexical que resolveu o código TUSS.",
+      "enum": [
+        "EXATO",
+        "REGRA_VISUAL",
+        "FUZZY_BM25",
+        "NAO_ENCONTRADO"
+      ],
+      "title": "MetodoCorrecaoTUSS",
+      "type": "string"
+    },
+    "PacienteLGPDOutput": {
+      "properties": {
+        "paciente_validado_cadastro": {
+          "description": "True se localizado no cadastro mestre pacientes_simulados.csv.",
+          "title": "Paciente Validado Cadastro",
+          "type": "boolean"
+        },
+        "metodo_match_paciente": {
+          "description": "EXATO_CARTEIRA, FUZZY_CARTEIRA_NOME ou NAO_LOCALIZADO.",
+          "title": "Metodo Match Paciente",
+          "type": "string"
+        },
+        "score_match_paciente": {
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Score Match Paciente",
+          "type": "number"
+        },
+        "nome_paciente_mascarado": {
+          "description": "Nome anonimizado conforme LGPD (ex: M**** S**** O*******).",
+          "title": "Nome Paciente Mascarado",
+          "type": "string"
+        },
+        "carteira_plano_mascarada": {
+          "description": "Carteirinha mascarada (ex: 0032***********01).",
+          "title": "Carteira Plano Mascarada",
+          "type": "string"
+        },
+        "paciente_hash_sha256": {
+          "description": "Hash SHA-256 com salt para deduplicação analítica sem expor PII.",
+          "title": "Paciente Hash Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "paciente_validado_cadastro",
+        "metodo_match_paciente",
+        "score_match_paciente",
+        "nome_paciente_mascarado",
+        "carteira_plano_mascarada",
+        "paciente_hash_sha256"
+      ],
+      "title": "PacienteLGPDOutput",
+      "type": "object"
+    },
+    "ProcedimentoValidadoOutput": {
+      "properties": {
+        "sequencial_item": {
+          "title": "Sequencial Item",
+          "type": "integer"
+        },
+        "codigo_tuss_ocr_bruto": {
+          "description": "Código bruto lido pelo OCR (métrica de acurácia Pré-RAG no Databricks).",
+          "title": "Codigo Tuss Ocr Bruto",
+          "type": "string"
+        },
+        "codigo_tuss_corrigido": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Código oficial TUSS de 8 dígitos após RAG Lexical (acurácia Pós-RAG).",
+          "title": "Codigo Tuss Corrigido"
+        },
+        "descricao_ocr_bruta": {
+          "title": "Descricao Ocr Bruta",
+          "type": "string"
+        },
+        "descricao_tuss_oficial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Descrição oficial limpa (display_name.strip()) da tabela TUSS.",
+          "title": "Descricao Tuss Oficial"
+        },
+        "source_tuss": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Coluna source da base TUSS.",
+          "title": "Source Tuss"
+        },
+        "vigencia_ativa": {
+          "default": true,
+          "description": "True se extras_fim_vigencia estiver vazio na base oficial.",
+          "title": "Vigencia Ativa",
+          "type": "boolean"
+        },
+        "quantidade": {
+          "default": 1,
+          "title": "Quantidade",
+          "type": "integer"
+        },
+        "valor_unitario": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valor Unitario"
+        },
+        "score_confianca_lexical": {
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Score Confianca Lexical",
+          "type": "number"
+        },
+        "score_fuzzy_codigo": {
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Score Fuzzy Codigo",
+          "type": "number"
+        },
+        "score_bm25_descricao": {
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Score Bm25 Descricao",
+          "type": "number"
+        },
+        "metodo_correcao": {
+          "$ref": "#/$defs/MetodoCorrecaoTUSS"
+        },
+        "requer_revisao_humana": {
+          "description": "True quando score_confianca_lexical < 90.0 ou código não localizado.",
+          "title": "Requer Revisao Humana",
+          "type": "boolean"
+        },
+        "motivo_revisao": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Motivo Revisao"
+        }
+      },
+      "required": [
+        "sequencial_item",
+        "codigo_tuss_ocr_bruto",
+        "descricao_ocr_bruta",
+        "score_confianca_lexical",
+        "score_fuzzy_codigo",
+        "score_bm25_descricao",
+        "metodo_correcao",
+        "requer_revisao_humana"
+      ],
+      "title": "ProcedimentoValidadoOutput",
+      "type": "object"
+    },
+    "StatusAuditoriaGuia": {
+      "description": "Define o roteamento operacional da guia na Clínica Vida+.",
+      "enum": [
+        "APROVADA_AUTO",
+        "FILA_REVISAO_HUMANA"
+      ],
+      "title": "StatusAuditoriaGuia",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "guia_uuid": {
+      "title": "Guia Uuid",
+      "type": "string"
+    },
+    "arquivo_origem": {
+      "title": "Arquivo Origem",
+      "type": "string"
+    },
+    "unidade_clinica": {
+      "title": "Unidade Clinica",
+      "type": "string"
+    },
+    "timestamp_processamento_utc": {
+      "title": "Timestamp Processamento Utc",
+      "type": "string"
+    },
+    "numero_guia_prestador": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Numero Guia Prestador"
+    },
+    "numero_guia_operadora": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Numero Guia Operadora"
+    },
+    "registro_ans": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Registro Ans"
+    },
+    "data_atendimento": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Data Atendimento"
+    },
+    "cid10": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cid10"
+    },
+    "carater_atendimento": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Carater Atendimento"
+    },
+    "paciente": {
+      "$ref": "#/$defs/PacienteLGPDOutput"
+    },
+    "profissional_solicitante_mascarado": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Profissional Solicitante Mascarado"
+    },
+    "conselho_profissional": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Conselho Profissional"
+    },
+    "procedimentos": {
+      "items": {
+        "$ref": "#/$defs/ProcedimentoValidadoOutput"
+      },
+      "title": "Procedimentos",
+      "type": "array"
+    },
+    "total_procedimentos": {
+      "title": "Total Procedimentos",
+      "type": "integer"
+    },
+    "total_requer_hitl": {
+      "title": "Total Requer Hitl",
+      "type": "integer"
+    },
+    "status_auditoria_guia": {
+      "$ref": "#/$defs/StatusAuditoriaGuia"
+    },
+    "score_medio_guia": {
+      "title": "Score Medio Guia",
+      "type": "number"
+    },
+    "motor_ocr_utilizado": {
+      "title": "Motor Ocr Utilizado",
+      "type": "string"
+    },
+    "latencia_processamento_ms": {
+      "title": "Latencia Processamento Ms",
+      "type": "number"
+    },
+    "versao_pipeline": {
+      "default": "1.0.0-mvp",
+      "title": "Versao Pipeline",
+      "type": "string"
+    }
+  },
+  "required": [
+    "guia_uuid",
+    "arquivo_origem",
+    "unidade_clinica",
+    "paciente",
+    "procedimentos",
+    "total_procedimentos",
+    "total_requer_hitl",
+    "status_auditoria_guia",
+    "score_medio_guia",
+    "motor_ocr_utilizado",
+    "latencia_processamento_ms"
+  ],
+  "title": "GuiaProcessadaOutput",
+  "type": "object"
+}
