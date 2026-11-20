@@ -14,14 +14,21 @@ Schema formal (JSON Schema): [`guia_processada_output.schema.json`](guia_process
 | Procedimentos | Array aninhado `procedimentos[]` (fazer `explode` na Silver) |
 | Como gerar | `python ia_ocr_rag/scripts/batch_processor.py` (na raiz do repositório) |
 | Regeneração | Cada execução sobrescreve o arquivo inteiro com o lote completo |
-| Versão do contrato | Campo `versao_pipeline` (atual: `1.0.0-mvp`) |
+| Versão do contrato | Campo `versao_pipeline` (atual: `2.0.0-mvp`) |
 
-**LGPD:** o `.jsonl` não contém dados pessoais em claro. Nome e carteirinha do paciente
-chegam mascarados, mais um hash SHA-256 com salt para contagem e deduplicação.
-Como barreira extra, qualquer campo de texto do cabeçalho que contenha uma carteirinha
-(17 dígitos ou número do cadastro), lida pelo OCR no campo errado, também sai mascarado.
-A extração bruta do OCR (`output_json/ocr_bruto/`) contém PII, é só de uso local e
-**não faz parte desta entrega**.
+**Dados pessoais:** o MVP usa apenas clínicas e pacientes fictícios, então o projeto **não aplica
+mascaramento (LGPD)** em nenhuma etapa. Nome e carteirinha do paciente e nome do profissional
+chegam em claro, como lidos pelo OCR e, quando o paciente é localizado, também como estão no cadastro.
+
+**Mudanças da versão `2.0.0-mvp` (quebram o schema da `1.0.0-mvp`):**
+
+| Antes (`1.0.0-mvp`) | Agora (`2.0.0-mvp`) |
+| :--- | :--- |
+| `paciente.nome_paciente_mascarado` | `paciente.nome_paciente_ocr_bruto` + `paciente.nome_paciente_cadastro` |
+| `paciente.carteira_plano_mascarada` | `paciente.carteira_plano_ocr_bruta` + `paciente.carteira_plano_cadastro` |
+| `paciente.paciente_hash_sha256` | removido (usar `carteira_plano_cadastro` como chave do paciente) |
+| `profissional_solicitante_mascarado` | `profissional_solicitante` |
+| Campos do cabeçalho com carteirinha mascarada | Campos do cabeçalho exatamente como lidos |
 
 ## 2. Dicionário de campos
 
@@ -30,7 +37,7 @@ A extração bruta do OCR (`output_json/ocr_bruto/`) contém PII, é só de uso 
 | Campo | Tipo | Nulo? | Descrição |
 | :--- | :--- | :--- | :--- |
 | `guia_uuid` | string | não | UUID v5 determinístico do nome do arquivo. Estável entre execuções, então serve como chave de `MERGE`. |
-| `arquivo_origem` | string | não | Nome da imagem (ex.: `Paciente_2.png`). Chave de ligação com o gabarito. |
+| `arquivo_origem` | string | não | Nome da imagem (ex.: `guia_002.png`). Sem a extensão, é igual ao `id_guia` do gabarito. Chave de ligação com o gabarito. |
 | `unidade_clinica` | string | não | Unidade da rede (`UNIDADE_01_MATRIZ` … `UNIDADE_08_MEIER`). **Simulada** no batch (rodízio). |
 | `timestamp_processamento_utc` | string | não | ISO-8601 UTC (ex.: `2026-11-18T23:10:05.123456+00:00`). Converter com `to_timestamp`. |
 | `numero_guia_prestador` | string | sim | Como lido na guia. |
@@ -40,7 +47,7 @@ A extração bruta do OCR (`output_json/ocr_bruto/`) contém PII, é só de uso 
 | `cid10` | string | sim | Como lido na guia. |
 | `carater_atendimento` | string | sim | Como lido na guia. |
 | `paciente` | struct | não | Ver 2.2. |
-| `profissional_solicitante_mascarado` | string | sim | Nome do profissional mascarado. |
+| `profissional_solicitante` | string | sim | Nome do profissional como lido na guia. |
 | `conselho_profissional` | string | sim | Sigla + UF + número (ex.: `CRM RJ 123456`). |
 | `procedimentos` | array<struct> | não | Ver 2.3. Pode vir vazio (`[]`). |
 | `total_procedimentos` | long | não | Tamanho de `procedimentos`. |
@@ -58,9 +65,10 @@ A extração bruta do OCR (`output_json/ocr_bruto/`) contém PII, é só de uso 
 | `paciente_validado_cadastro` | boolean | Localizado no cadastro `pacientes_simulados.csv`. |
 | `metodo_match_paciente` | string | `EXATO_CARTEIRA`, `FUZZY_CARTEIRA_NOME` ou `NAO_LOCALIZADO`. |
 | `score_match_paciente` | double | 0–100. |
-| `nome_paciente_mascarado` | string | Ex.: `B**** F********` (`NAO_INFORMADO` se ausente). |
-| `carteira_plano_mascarada` | string | Ex.: `0032***********12` (`NAO_INFORMADA` se ausente). |
-| `paciente_hash_sha256` | string | Pseudônimo para contagem distinta e deduplicação. |
+| `nome_paciente_ocr_bruto` | string (nulo) | Nome **como lido pelo OCR** → métrica de extração. Pode vir em outro alfabeto (ex.: coreano), como escrito na guia. |
+| `carteira_plano_ocr_bruta` | string (nulo) | Carteirinha **como lida pelo OCR**. |
+| `nome_paciente_cadastro` | string (nulo) | Nome oficial do cadastro. `null` se `paciente_validado_cadastro = false`. |
+| `carteira_plano_cadastro` | string (nulo) | Carteirinha oficial de 17 dígitos. `null` se não localizado. Chave do paciente para contagem distinta. |
 
 ### 2.3 `procedimentos[]` (1 linha por item após `explode`)
 
@@ -92,8 +100,9 @@ guia_uuid STRING, arquivo_origem STRING, unidade_clinica STRING, timestamp_proce
 numero_guia_prestador STRING, numero_guia_operadora STRING, registro_ans STRING, data_atendimento STRING,
 cid10 STRING, carater_atendimento STRING,
 paciente STRUCT<paciente_validado_cadastro: BOOLEAN, metodo_match_paciente: STRING, score_match_paciente: DOUBLE,
-  nome_paciente_mascarado: STRING, carteira_plano_mascarada: STRING, paciente_hash_sha256: STRING>,
-profissional_solicitante_mascarado STRING, conselho_profissional STRING,
+  nome_paciente_ocr_bruto: STRING, carteira_plano_ocr_bruta: STRING,
+  nome_paciente_cadastro: STRING, carteira_plano_cadastro: STRING>,
+profissional_solicitante STRING, conselho_profissional STRING,
 procedimentos ARRAY<STRUCT<sequencial_item: BIGINT, codigo_tuss_ocr_bruto: STRING, codigo_tuss_corrigido: STRING,
   descricao_ocr_bruta: STRING, descricao_tuss_oficial: STRING, source_tuss: STRING, vigencia_ativa: BOOLEAN,
   quantidade: BIGINT, valor_unitario: DOUBLE, score_confianca_lexical: DOUBLE, score_fuzzy_codigo: DOUBLE,
@@ -119,10 +128,34 @@ silver_procedimentos = (
 - **Pré-RAG:** `codigo_tuss_ocr_bruto` comparado **literalmente** com o código do gabarito. Pela regra de fidelidade óptica, o OCR não corrige nada; é essa a medida honesta da leitura bruta. Exemplo: `0040302733` contra `40302733` conta como erro no Pré-RAG.
 - **Pós-RAG:** `codigo_tuss_corrigido` comparado com o código do gabarito. Item com `codigo_tuss_corrigido = null` conta como erro.
 - **Itens sem código na guia** (`codigo_tuss_ocr_bruto = ""`): o código é sugerido pelo RAG só pela descrição e **sempre** vai para revisão humana (score máximo 88). No Pré-RAG contam como erro; vale separá-los no dashboard (`codigo_tuss_ocr_bruto = ''`), porque medem a busca por descrição e não a leitura do OCR.
-- **Chave de ligação com o gabarito:** `arquivo_origem` + `sequencial_item`.
-  Atenção: se o OCR pular ou inventar um item, a numeração da guia desalinha. Recomendo um `FULL OUTER JOIN` e contar à parte os itens que só existem de um lado (perdidos ou inventados pelo OCR), em vez de usar só `INNER JOIN`.
-- **Formato sugerido do gabarito** (`gabarito_12_guias.csv`):
-  `arquivo_origem, sequencial_item, codigo_tuss_correto, descricao_correta`.
+- **Gabarito** (`ia_ocr_rag/data/gabarito/gabarito.csv`, separador `;`):
+  `id_guia;item;nome;carteirinha;codigo_tuss;descricao` (97 linhas, 1 por procedimento).
+- **Chave da guia:** o arquivo tem o mesmo nome do `id_guia` (`guia_006.png` ↔ `guia_006`).
+- **Chave do item:** `sequencial_item` ↔ `item`. Só bate se o OCR ler os mesmos itens na mesma ordem;
+  se o OCR pular ou inventar um item, a numeração desalinha. Use `FULL OUTER JOIN` e conte à parte os
+  itens que só existem de um lado (perdidos ou inventados pelo OCR).
+- **Códigos com zeros à esquerda:** o gabarito traz o código como impresso (ex.: `0040302733`, guia_002).
+  No Pré-RAG compare literal; no Pós-RAG normalize o gabarito para 8 dígitos.
+- **Guias 007 e 012:** o gabarito não tem código (a guia lista só descrições), então ficam fora do Pós-RAG.
+- **Descrição:** compare `descricao` do gabarito com `descricao_ocr_bruta` (texto como impresso), não com a oficial.
+
+```python
+gabarito = (spark.read.option("header", True).option("sep", ";").csv("<caminho>/gabarito.csv")
+    .withColumn("codigo_gabarito_8d",
+        F.when((F.length("codigo_tuss") > 8) & F.col("codigo_tuss").startswith("00"),
+               F.substring("codigo_tuss", -8, 8)).otherwise(F.col("codigo_tuss"))))
+
+comparacao = (
+    silver_procedimentos
+    .withColumn("id_guia", F.regexp_replace("arquivo_origem", r"\.[A-Za-z]+$", ""))
+    .join(gabarito, (F.col("id_guia") == gabarito.id_guia) & (F.col("sequencial_item") == gabarito.item.cast("long")), "full_outer")
+    .withColumn("acerto_pre_rag", F.col("codigo_tuss_ocr_bruto") == F.col("codigo_tuss"))
+    .withColumn("acerto_pos_rag", F.col("codigo_tuss_corrigido") == F.col("codigo_gabarito_8d"))
+)
+```
+
+A avaliação de referência da frente de IA (`python ia_ocr_rag/scripts/avaliar_gabarito.py`) alinha os
+itens por similaridade, respeitando a ordem, e serve para conferir os números do dashboard.
 
 ## 5. Exemplo real (1 linha do `.jsonl`, formatada)
 

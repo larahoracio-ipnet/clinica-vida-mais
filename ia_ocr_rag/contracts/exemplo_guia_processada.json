@@ -1,8 +1,8 @@
 {
-  "guia_uuid": "2ebc2df2-38f2-5884-8377-9ccf02398e69",
-  "arquivo_origem": "Paciente_3.png",
-  "unidade_clinica": "UNIDADE_06_NITEROI",
-  "timestamp_processamento_utc": "2026-11-19T00:54:28.590306+00:00",
+  "guia_uuid": "48dc7748-1c7f-5bc3-9c99-72c3977396f9",
+  "arquivo_origem": "guia_003.png",
+  "unidade_clinica": "UNIDADE_03_BARRA",
+  "timestamp_processamento_utc": "2026-11-19T18:00:45.192171+00:00",
   "numero_guia_prestador": null,
   "numero_guia_operadora": null,
   "registro_ans": null,
@@ -13,11 +13,12 @@
     "paciente_validado_cadastro": true,
     "metodo_match_paciente": "FUZZY_CARTEIRA_NOME",
     "score_match_paciente": 100.0,
-    "nome_paciente_mascarado": "C**** L******",
-    "carteira_plano_mascarada": "0032***********46",
-    "paciente_hash_sha256": "10a0394207bf7217deeda48a31123157320401226c5c92f1f6c08dd142da8fdd"
+    "nome_paciente_ocr_bruto": "Chloe Laurent",
+    "carteira_plano_ocr_bruta": null,
+    "nome_paciente_cadastro": "Chloé Laurent",
+    "carteira_plano_cadastro": "00320000000000146"
   },
-  "profissional_solicitante_mascarado": null,
+  "profissional_solicitante": null,
   "conselho_profissional": null,
   "procedimentos": [
     {
@@ -56,7 +57,7 @@
     },
     {
       "sequencial_item": 3,
-      "codigo_tuss_ocr_bruto": "27602237",
+      "codigo_tuss_ocr_bruto": "20102237",
       "codigo_tuss_corrigido": "31602231",
       "descricao_ocr_bruta": "ANESTESIA",
       "descricao_tuss_oficial": "Anestesia para endoscopia diagnóstica",
@@ -94,6 +95,6 @@
   "status_auditoria_guia": "FILA_REVISAO_HUMANA",
   "score_medio_guia": 71.72,
   "motor_ocr_utilizado": "gemini-3.1-flash-lite",
-  "latencia_processamento_ms": 3193.61,
-  "versao_pipeline": "1.0.0-mvp"
+  "latencia_processamento_ms": 4744.41,
+  "versao_pipeline": "2.0.0-mvp"
 }

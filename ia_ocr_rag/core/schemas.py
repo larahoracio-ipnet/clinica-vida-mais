@@ -73,7 +73,12 @@ class GuiaOCRRaw(BaseModel):
 # ==============================================================================
 # 3. CONTRATO DE SAÍDA FINAL (IA -> backend/ FastAPI & databricks_dados/ Bronze)
 # ==============================================================================
-class PacienteLGPDOutput(BaseModel):
+class PacienteOutput(BaseModel):
+    """
+    Identificação do paciente, sem mascaramento (MVP com dados fictícios).
+    Segue o mesmo padrão "lido × corrigido" dos códigos TUSS: o valor como o OCR leu
+    e, quando o paciente é localizado, o valor oficial do cadastro.
+    """
     paciente_validado_cadastro: bool = Field(
         ..., description="True se localizado no cadastro mestre pacientes_simulados.csv."
     )
@@ -81,14 +86,17 @@ class PacienteLGPDOutput(BaseModel):
         ..., description="EXATO_CARTEIRA, FUZZY_CARTEIRA_NOME ou NAO_LOCALIZADO."
     )
     score_match_paciente: float = Field(..., ge=0.0, le=100.0)
-    nome_paciente_mascarado: str = Field(
-        ..., description="Nome anonimizado conforme LGPD (ex: M**** S**** O*******)."
+    nome_paciente_ocr_bruto: Optional[str] = Field(
+        default=None, description="Nome do paciente exatamente como lido pelo OCR."
     )
-    carteira_plano_mascarada: str = Field(
-        ..., description="Carteirinha mascarada (ex: 0032***********01)."
+    carteira_plano_ocr_bruta: Optional[str] = Field(
+        default=None, description="Carteirinha exatamente como lida pelo OCR."
     )
-    paciente_hash_sha256: str = Field(
-        ..., description="Hash SHA-256 com salt para deduplicação analítica sem expor PII."
+    nome_paciente_cadastro: Optional[str] = Field(
+        default=None, description="Nome oficial no cadastro (null se o paciente não foi localizado)."
+    )
+    carteira_plano_cadastro: Optional[str] = Field(
+        default=None, description="Carteirinha oficial de 17 dígitos no cadastro (null se não localizado)."
     )
 
 
@@ -133,8 +141,8 @@ class GuiaProcessadaOutput(BaseModel):
     data_atendimento: Optional[str] = None
     cid10: Optional[str] = None
     carater_atendimento: Optional[str] = None
-    paciente: PacienteLGPDOutput
-    profissional_solicitante_mascarado: Optional[str] = None
+    paciente: PacienteOutput
+    profissional_solicitante: Optional[str] = None
     conselho_profissional: Optional[str] = None
     procedimentos: List[ProcedimentoValidadoOutput]
     total_procedimentos: int
@@ -143,4 +151,4 @@ class GuiaProcessadaOutput(BaseModel):
     score_medio_guia: float
     motor_ocr_utilizado: str
     latencia_processamento_ms: float
-    versao_pipeline: str = "1.0.0-mvp"
+    versao_pipeline: str = "2.0.0-mvp"
