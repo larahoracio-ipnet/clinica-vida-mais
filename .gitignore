@@ -13,7 +13,7 @@ __pycache__/
 .ruff_cache/
 
 # ==============================================================================
-# SEGREDOS E CONFIGURAÇÕES LOCAIS (LGPD / SEGURANÇA)
+# SEGREDOS E CONFIGURAÇÕES LOCAIS (SEGURANÇA)
 # ==============================================================================
 .env
 .env.local
@@ -35,8 +35,10 @@ backend/storage/
 # ARTEFATOS TEMPORÁRIOS DE PROCESSAMENTO LOCAL
 # ==============================================================================
 ia_ocr_rag/data/output_json/individual/*.json
-# Extração bruta do OCR (contém PII em claro, uso local para medir acurácia)
+# Extração bruta do OCR (artefato local para medir acurácia e reprocessar sem API)
 ia_ocr_rag/data/output_json/ocr_bruto/
+# Relatório por item gerado por scripts/avaliar_gabarito.py
+ia_ocr_rag/data/output_json/avaliacao_gabarito_itens.csv
 !ia_ocr_rag/data/output_json/.gitkeep
 
 # ==============================================================================

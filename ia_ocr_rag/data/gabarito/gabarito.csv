@@ -1,0 +1,98 @@
+id_guia;item;nome;carteirinha;codigo_tuss;descricao
+guia_001;1;marina carvalho;00320000000000013;40316521;Tieroestmulante,hormônio (TSH) - pesquisa e/ou dosagem
+guia_001;2;marina carvalho;00320000000000013;40316491;T4 livre - pesquisa e/ou dosagem
+guia_001;3;marina carvalho;00320000000000013;40316572;Vitamina B12 - pesquisa e/ou dosagem
+guia_001;4;marina carvalho;00320000000000013;40302830;Vitamina "D" 25 HIDROXI pesquise e/ou dosagem
+guia_002;1;Bruno Fernandes;00320000000000013;0040302733;HEMOGLOBINA GLICADA
+guia_002;2;Bruno Fernandes;00320000000000013;0040302040;GLICOSE
+guia_002;3;Bruno Fernandes;00320000000000013;0040316521;TIEROESTIMULANTE, HORMÔNIO (TSH)
+guia_002;4;Bruno Fernandes;00320000000000013;0040316491;T4 LIVRE
+guia_002;5;Bruno Fernandes;00320000000000013;0040302830;VITAMINA D 25 HIDROXI, DOSAGEM (VITAMINA D3)
+guia_003;1;Chloé Laurent;00320000000000146;40202038;ENDOSCOPIA
+guia_003;2;Chloé Laurent;00320000000000146;40201082;COLONOSCOPIA
+guia_003;3;Chloé Laurent;00320000000000146;31602231;ANESTESIA
+guia_004;1;Tae-hyun Kang;00320000000000123;41101316;RNM ombro
+guia_005;1;Marcelo Lima;00320000000000060;40901211;Estruturas superficiais
+guia_005;2;Marcelo Lima;00320000000000060;40901122;Abdome total
+guia_006;1;Beatriz Ribeiro;00320000000000047;40304361;Hemograma
+guia_006;2;Beatriz Ribeiro;00320000000000047;40302040;Glicemia de Jejum
+guia_006;3;Beatriz Ribeiro;00320000000000047;40302733;Hemoglobina Glicada
+guia_006;4;Beatriz Ribeiro;00320000000000047;40302750;Perfil Lipídico Completo
+guia_006;5;Beatriz Ribeiro;00320000000000047;40301150;Ácido Úrico
+guia_006;6;Beatriz Ribeiro;00320000000000047;40302580;Ureia
+guia_006;7;Beatriz Ribeiro;00320000000000047;40301630;Creatinina
+guia_006;8;Beatriz Ribeiro;00320000000000047;40302423;Sódio
+guia_006;9;Beatriz Ribeiro;00320000000000047;40302318;Potássio
+guia_006;10;Beatriz Ribeiro;00320000000000047;40316572;Vitamina B12
+guia_006;11;Beatriz Ribeiro;00320000000000047;40302830;Vitamina D
+guia_006;12;Beatriz Ribeiro;00320000000000047;40305627;Provas Função Tireoidiana
+guia_006;13;Beatriz Ribeiro;00320000000000047;40312151;Provas Função Hepática
+guia_006;14;Beatriz Ribeiro;00320000000000047;40316270;Ferritina
+guia_006;15;Beatriz Ribeiro;00320000000000047;40301648;CPK
+guia_007;1;Su-bin Ahn;00320000000000098;;Hemograma completo
+guia_007;2;Su-bin Ahn;00320000000000098;;Glicemia de jejum
+guia_007;3;Su-bin Ahn;00320000000000098;;hemoglobina glicada
+guia_007;4;Su-bin Ahn;00320000000000098;;Insulina
+guia_007;5;Su-bin Ahn;00320000000000098;;Colesterol total e frações
+guia_007;6;Su-bin Ahn;00320000000000098;;triglicerídeos
+guia_007;7;Su-bin Ahn;00320000000000098;;TSH
+guia_007;8;Su-bin Ahn;00320000000000098;;T4 livre
+guia_007;9;Su-bin Ahn;00320000000000098;;T3 livre
+guia_007;10;Su-bin Ahn;00320000000000098;;Anti TPO
+guia_007;11;Su-bin Ahn;00320000000000098;;Anti - tieroglobulina
+guia_007;12;Su-bin Ahn;00320000000000098;;GGT
+guia_007;13;Su-bin Ahn;00320000000000098;;Vitamina B12
+guia_007;14;Su-bin Ahn;00320000000000098;;Vitamina D
+guia_007;15;Su-bin Ahn;00320000000000098;;Zinco sérico
+guia_007;16;Su-bin Ahn;00320000000000098;;Selenio
+guia_007;17;Su-bin Ahn;00320000000000098;;Ferro
+guia_007;18;Su-bin Ahn;00320000000000098;;Ferritina
+guia_007;19;Su-bin Ahn;00320000000000098;;Indice de saturação de transferrina
+guia_008;1;Gabriel Alves;;40103137;Campo visual
+guia_008;2;Gabriel Alves;;41301129;Curva tensional diária
+guia_008;3;Gabriel Alves;;41301153;Estereofoto de papila
+guia_008;4;Gabriel Alves;;41501128;Paquimetria
+guia_008;5;Gabriel Alves;;41501144;OCT Glaucoma
+guia_009;1;Min-jun Kang;00320000000000088;40304361;Hemograma com contagem de plaquetas ou frações (eritrograma, leucograma, plaquetas)
+guia_009;2;Min-jun Kang;00320000000000088;40302040;Glicose - pesquisa e/ou dosagem
+guia_009;3;Min-jun Kang;00320000000000088;40302733;Hemoglobina glicada (Fração A1c) - pesquisa e/ou dosagem
+guia_009;4;Min-jun Kang;00320000000000088;40316360;Insulina - pesquisa e/ou dosagem
+guia_009;5;Min-jun Kang;00320000000000088;40302750;Perfil lipídico / lipidograma (lipídios totais, colesterol, triglicerídios e eletroforese lipoproteínas) - pesquisa e/ou dosagem
+guia_009;6;Min-jun Kang;00320000000000088;40312151;Provas de função hepática (bilirrubinas, eletroforese de proteínas. FA, TGO, TGP e Gama-PGT)
+guia_009;7;Min-jun Kang;00320000000000088;40302580;Uréia - pesquisa e/ou dosagem
+guia_009;8;Min-jun Kang;00320000000000088;40301630;Creatinina - pesquisa e/ou dosagem
+guia_009;9;Min-jun Kang;00320000000000088;40301281;Amilase - pesquisa e/ou dosagem
+guia_009;10;Min-jun Kang;00320000000000088;40302199;Lipase - pesquisa e/ou dosagem
+guia_009;11;Min-jun Kang;00320000000000088;40316572;Vitamina B12 - pesquisa e/ou dosagem
+guia_009;12;Min-jun Kang;00320000000000088;40302830;Vitamina "D" 25 HIDROXI, pesquisa e/ou dosagem (Vitamina D3) - pesquisa e/ou dosagem
+guia_009;13;Min-jun Kang;00320000000000088;40301842;Ferro sérico - pesquisa e/ou dosagem
+guia_009;14;Min-jun Kang;00320000000000088;40316270;Ferritina - pesquisa e/ou dosagem
+guia_009;15;Min-jun Kang;00320000000000088;40301087;Ácido fólico, pesquisa e/ou dosagem nos eritrócitos
+guia_009;16;Min-jun Kang;00320000000000088;40302423;Sódio - pesquisa e/ou dosagem
+guia_009;17;Min-jun Kang;00320000000000088;40302318;Potássio - pesquisa e/ou dosagem
+guia_009;18;Min-jun Kang;00320000000000088;40305627;Provas de função tireoideana (T3, T4, T4 livre e TSH)
+guia_009;19;Min-jun Kang;00320000000000088;40311210;Rotina de urina (caracteres físicos, elementos anormais e sedimentoscopia)
+guia_010;1;;00320000000000099;40805026;Radiografia de tórax - 2 incidências
+guia_011;1;marina carvalho;00320000000000013;40316521;Tieroestmulante,hormônio (TSH) - pesquisa e/ou dosagem
+guia_011;2;marina carvalho;00320000000000013;40316491;T4 livre - pesquisa e/ou dosagem
+guia_011;3;marina carvalho;00320000000000013;40316572;Vitamina B12 - pesquisa e/ou dosagem
+guia_011;4;marina carvalho;00320000000000013;40302830;Vitamina D 25 HIDROXI pesquise e/ou dosagem
+guia_012;1;Su-bin Ahn;00320000000000098;;Hemograma completo
+guia_012;2;Su-bin Ahn;00320000000000098;;Glicemia de jejum
+guia_012;3;Su-bin Ahn;00320000000000098;;hemoglobina glicada
+guia_012;4;Su-bin Ahn;00320000000000098;;Insulina
+guia_012;5;Su-bin Ahn;00320000000000098;;Colesterol total e frações
+guia_012;6;Su-bin Ahn;00320000000000098;;triglicerídeos
+guia_012;7;Su-bin Ahn;00320000000000098;;TSH
+guia_012;8;Su-bin Ahn;00320000000000098;;T4 livre
+guia_012;9;Su-bin Ahn;00320000000000098;;T3 livre
+guia_012;10;Su-bin Ahn;00320000000000098;;Anti TPO
+guia_012;11;Su-bin Ahn;00320000000000098;;Anti - tieroglobulina
+guia_012;12;Su-bin Ahn;00320000000000098;;GGT
+guia_012;13;Su-bin Ahn;00320000000000098;;Vitamina B12
+guia_012;14;Su-bin Ahn;00320000000000098;;Vitamina D
+guia_012;15;Su-bin Ahn;00320000000000098;;Zinco sérico
+guia_012;16;Su-bin Ahn;00320000000000098;;Selenio
+guia_012;17;Su-bin Ahn;00320000000000098;;Ferro
+guia_012;18;Su-bin Ahn;00320000000000098;;Ferritina
+guia_012;19;Su-bin Ahn;00320000000000098;;Indice de saturação de transferrina
