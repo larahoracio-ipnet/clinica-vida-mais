@@ -11,7 +11,8 @@
       "title": "MetodoCorrecaoTUSS",
       "type": "string"
     },
-    "PacienteLGPDOutput": {
+    "PacienteOutput": {
+      "description": "Identificação do paciente, sem mascaramento (MVP com dados fictícios).\nSegue o mesmo padrão \"lido × corrigido\" dos códigos TUSS: o valor como o OCR leu\ne, quando o paciente é localizado, o valor oficial do cadastro.",
       "properties": {
         "paciente_validado_cadastro": {
           "description": "True se localizado no cadastro mestre pacientes_simulados.csv.",
@@ -29,31 +30,65 @@
           "title": "Score Match Paciente",
           "type": "number"
         },
-        "nome_paciente_mascarado": {
-          "description": "Nome anonimizado conforme LGPD (ex: M**** S**** O*******).",
-          "title": "Nome Paciente Mascarado",
-          "type": "string"
+        "nome_paciente_ocr_bruto": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Nome do paciente exatamente como lido pelo OCR.",
+          "title": "Nome Paciente Ocr Bruto"
         },
-        "carteira_plano_mascarada": {
-          "description": "Carteirinha mascarada (ex: 0032***********01).",
-          "title": "Carteira Plano Mascarada",
-          "type": "string"
+        "carteira_plano_ocr_bruta": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Carteirinha exatamente como lida pelo OCR.",
+          "title": "Carteira Plano Ocr Bruta"
         },
-        "paciente_hash_sha256": {
-          "description": "Hash SHA-256 com salt para deduplicação analítica sem expor PII.",
-          "title": "Paciente Hash Sha256",
-          "type": "string"
+        "nome_paciente_cadastro": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Nome oficial no cadastro (null se o paciente não foi localizado).",
+          "title": "Nome Paciente Cadastro"
+        },
+        "carteira_plano_cadastro": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Carteirinha oficial de 17 dígitos no cadastro (null se não localizado).",
+          "title": "Carteira Plano Cadastro"
         }
       },
       "required": [
         "paciente_validado_cadastro",
         "metodo_match_paciente",
-        "score_match_paciente",
-        "nome_paciente_mascarado",
-        "carteira_plano_mascarada",
-        "paciente_hash_sha256"
+        "score_match_paciente"
       ],
-      "title": "PacienteLGPDOutput",
+      "title": "PacienteOutput",
       "type": "object"
     },
     "ProcedimentoValidadoOutput": {
@@ -285,9 +320,9 @@
       "title": "Carater Atendimento"
     },
     "paciente": {
-      "$ref": "#/$defs/PacienteLGPDOutput"
+      "$ref": "#/$defs/PacienteOutput"
     },
-    "profissional_solicitante_mascarado": {
+    "profissional_solicitante": {
       "anyOf": [
         {
           "type": "string"
@@ -297,7 +332,7 @@
         }
       ],
       "default": null,
-      "title": "Profissional Solicitante Mascarado"
+      "title": "Profissional Solicitante"
     },
     "conselho_profissional": {
       "anyOf": [
@@ -342,7 +377,7 @@
       "type": "number"
     },
     "versao_pipeline": {
-      "default": "1.0.0-mvp",
+      "default": "2.0.0-mvp",
       "title": "Versao Pipeline",
       "type": "string"
     }

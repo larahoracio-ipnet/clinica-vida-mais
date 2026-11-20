@@ -12,9 +12,6 @@ from dotenv import load_dotenv
 from ia_ocr_rag.core.lexical_rag import (
     REPO_ROOT,
     LexicalTUSSEngine,
-    extrair_apenas_digitos,
-    mascarar_carteira_lgpd,
-    mascarar_nome_lgpd,
     resolver_caminho_repo,
 )
 from ia_ocr_rag.core.ocr_extractor import GuiaOCRExtractor
@@ -42,48 +39,21 @@ def get_lexical_engine() -> LexicalTUSSEngine:
         "ia_ocr_rag/data/reference/pacientes_simulados.csv",
     )
     threshold = float(os.getenv("HITL_CONFIDENCE_THRESHOLD", "90.0"))
-    salt = os.getenv("LGPD_HASH_SALT", "clinica_vidamais_mvp_salt_ipnet_2026")
 
     return LexicalTUSSEngine(
         tuss_csv_path=tuss_path,
         pacientes_csv_path=pacientes_path,
         hitl_threshold=threshold,
-        lgpd_salt=salt,
     )
 
 
 @lru_cache(maxsize=1)
 def get_ocr_extractor() -> GuiaOCRExtractor:
-    """Instância única do extrator multimodal Gemini 3.8 Flash + fallback RapidOCR."""
+    """Instância única do extrator multimodal Gemini (com modelos reserva) + fallback RapidOCR."""
     return GuiaOCRExtractor(
         api_key=os.getenv("GEMINI_API_KEY"),
-        model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-3.8-flash"),
+        model_name=os.getenv("GEMINI_MODEL_NAME"),  # cadeia completa vem de GEMINI_FALLBACK_MODELS
     )
-
-
-# Campos de texto do cabeçalho copiados do OCR para a saída final
-CAMPOS_CABECALHO_SAIDA = (
-    "numero_guia_prestador",
-    "numero_guia_operadora",
-    "registro_ans",
-    "data_atendimento",
-    "cid10",
-    "carater_atendimento",
-)
-
-
-def sanitizar_campo_lgpd(valor: Optional[str], engine: LexicalTUSSEngine) -> Optional[str]:
-    """
-    Barreira LGPD para campos de cabeçalho: o OCR pode ler a carteirinha no campo errado
-    (ex.: no nº da guia). Se o valor contiver 17 dígitos ou uma carteirinha do cadastro,
-    ele é mascarado antes de chegar à camada analítica.
-    """
-    if not valor:
-        return valor
-    digitos = extrair_apenas_digitos(valor)
-    if len(digitos) == 17 or digitos in engine.pacientes_by_carteira:
-        return mascarar_carteira_lgpd(digitos)
-    return valor
 
 
 def _formatar_conselho(
@@ -103,9 +73,9 @@ def salvar_extracao_bruta_ocr(
     output_dir: Optional[str | Path] = None,
 ) -> Path:
     """
-    Persiste exatamente o que o motor multimodal leu da imagem (antes de RAG e LGPD),
-    para medir a acurácia da extração contra o gabarito manual.
-    ATENÇÃO LGPD: contém PII em claro. Uso local apenas (pasta ignorada pelo git).
+    Persiste exatamente o que o motor multimodal leu da imagem (antes do RAG),
+    para medir a acurácia da extração contra o gabarito e reprocessar sem chamar a API.
+    Artefato local de depuração (pasta ignorada pelo git).
     """
     base_out = resolver_caminho_repo(
         output_dir or os.getenv("OUTPUT_JSON_DIR", "ia_ocr_rag/data/output_json")
@@ -124,38 +94,24 @@ def salvar_extracao_bruta_ocr(
     return destino
 
 
-def processar_guia_end_to_end(
+def montar_guia_processada(
     request: GuiaProcessamentoRequest,
-    force_offline: bool = False,
-    salvar_ocr_bruto: bool = False,
+    guia_raw: GuiaOCRRaw,
+    motor_ocr: str,
+    inicio: Optional[float] = None,
 ) -> GuiaProcessadaOutput:
     """
-    Executa o fluxo completo da Clínica Vida+:
-      1. Extração estruturada OCR (Gemini 3.8 Flash ou RapidOCR offline).
-      2. Validação cadastral e mascaramento LGPD do paciente e do profissional.
-      3. Padronização lexical TUSS (Exato + Ruído Óptico + Fuzzy + BM25).
-      4. Roteamento automático vs. fila Human-in-the-Loop (score < 90%).
+    Etapa pós-OCR (determinística, sem chamar a API):
+      1. Validação cadastral do paciente.
+      2. Padronização lexical TUSS (Exato + Ruído Óptico + Fuzzy + BM25).
+      3. Roteamento automático vs. fila Human-in-the-Loop (score < 90%).
     """
-    inicio = time.perf_counter()
-
+    inicio = time.perf_counter() if inicio is None else inicio
     engine = get_lexical_engine()
-    extractor = get_ocr_extractor()
 
-    caminho_img = resolver_caminho_repo(request.caminho_arquivo)
-    guia_raw, motor_ocr = extractor.extrair_guia(caminho_img, force_offline=force_offline)
-
-    if salvar_ocr_bruto:
-        salvar_extracao_bruta_ocr(request.guia_uuid, request.arquivo_nome, motor_ocr, guia_raw)
-
-    # 1. Governança LGPD: valida e anonimiza PII do beneficiário e do médico antes de persistir
-    paciente_lgpd = engine.validar_e_mascarar_paciente(
+    paciente = engine.validar_paciente(
         nome_ocr=guia_raw.nome_paciente_ocr,
         carteira_ocr=guia_raw.carteira_plano_ocr,
-    )
-    profissional_mascarado = (
-        mascarar_nome_lgpd(guia_raw.nome_profissional_ocr)
-        if guia_raw.nome_profissional_ocr
-        else None
     )
     conselho_fmt = _formatar_conselho(
         guia_raw.conselho_profissional_ocr,
@@ -163,7 +119,6 @@ def processar_guia_end_to_end(
         guia_raw.numero_conselho_ocr,
     )
 
-    # 2. Validação e correção lexical de todos os procedimentos da guia
     procedimentos_validados: List[ProcedimentoValidadoOutput] = [
         engine.validar_procedimento(proc) for proc in guia_raw.procedimentos
     ]
@@ -191,14 +146,14 @@ def processar_guia_end_to_end(
         guia_uuid=request.guia_uuid,
         arquivo_origem=request.arquivo_nome,
         unidade_clinica=request.unidade_clinica,
-        numero_guia_prestador=sanitizar_campo_lgpd(guia_raw.numero_guia_prestador, engine),
-        numero_guia_operadora=sanitizar_campo_lgpd(guia_raw.numero_guia_operadora, engine),
-        registro_ans=sanitizar_campo_lgpd(guia_raw.registro_ans, engine),
-        data_atendimento=sanitizar_campo_lgpd(guia_raw.data_atendimento, engine),
-        cid10=sanitizar_campo_lgpd(guia_raw.cid10_ocr, engine),
-        carater_atendimento=sanitizar_campo_lgpd(guia_raw.carater_atendimento, engine),
-        paciente=paciente_lgpd,
-        profissional_solicitante_mascarado=profissional_mascarado,
+        numero_guia_prestador=guia_raw.numero_guia_prestador,
+        numero_guia_operadora=guia_raw.numero_guia_operadora,
+        registro_ans=guia_raw.registro_ans,
+        data_atendimento=guia_raw.data_atendimento,
+        cid10=guia_raw.cid10_ocr,
+        carater_atendimento=guia_raw.carater_atendimento,
+        paciente=paciente,
+        profissional_solicitante=guia_raw.nome_profissional_ocr,
         conselho_profissional=conselho_fmt,
         procedimentos=procedimentos_validados,
         total_procedimentos=total_procs,
@@ -208,6 +163,27 @@ def processar_guia_end_to_end(
         motor_ocr_utilizado=motor_ocr,
         latencia_processamento_ms=latencia_ms,
     )
+
+
+def processar_guia_end_to_end(
+    request: GuiaProcessamentoRequest,
+    force_offline: bool = False,
+    salvar_ocr_bruto: bool = False,
+) -> GuiaProcessadaOutput:
+    """
+    Executa o fluxo completo da Clínica Vida+:
+      1. Extração estruturada OCR (Gemini multimodal ou RapidOCR offline).
+      2. Etapa pós-OCR: validação do paciente, correção TUSS e roteamento (montar_guia_processada).
+    """
+    inicio = time.perf_counter()
+
+    caminho_img = resolver_caminho_repo(request.caminho_arquivo)
+    guia_raw, motor_ocr = get_ocr_extractor().extrair_guia(caminho_img, force_offline=force_offline)
+
+    if salvar_ocr_bruto:
+        salvar_extracao_bruta_ocr(request.guia_uuid, request.arquivo_nome, motor_ocr, guia_raw)
+
+    return montar_guia_processada(request, guia_raw, motor_ocr, inicio=inicio)
 
 
 def salvar_guia_json(

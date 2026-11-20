@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 import uuid
 from pathlib import Path
@@ -10,6 +11,7 @@ from dotenv import load_dotenv
 from google.adk.agents import Agent
 
 from ia_ocr_rag.core.lexical_rag import REPO_ROOT, resolver_caminho_repo
+from ia_ocr_rag.core.resiliencia_gemini import GeminiComFallback, cadeia_de_modelos
 from ia_ocr_rag.core.pipeline import (
     get_lexical_engine,
     get_ocr_extractor,
@@ -28,7 +30,7 @@ load_dotenv(REPO_ROOT / ".env")
 if os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_API_KEY"):
     os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
 
-EXTENSOES_IMAGEM = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
+EXTENSOES_IMAGEM = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".pdf"}
 NAO_IDENTIFICADO = "— não identificado"
 
 ROTULOS_CAMPOS_GUIA = {
@@ -50,8 +52,18 @@ ROTULOS_CAMPOS_GUIA = {
 # ==============================================================================
 # Utilitários internos
 # ==============================================================================
+def _normalizar_nome_guia(nome_arquivo: str) -> str:
+    """'guia 6', 'guia_6', '6' ou o nome antigo 'Paciente_6' -> 'guia_006' (padrão do dataset)."""
+    texto = nome_arquivo.strip()
+    numero = re.fullmatch(r"(?i)(?:guia|paciente)?[\s_-]*0*(\d{1,3})(\.[a-z]+)?", texto)
+    if numero:
+        return f"guia_{int(numero.group(1)):03d}{numero.group(2) or ''}"
+    return texto
+
+
 def _resolver_arquivo_guia(nome_arquivo: str) -> Optional[Path]:
-    """Aceita o nome do arquivo em input_guias/ (com ou sem extensão) ou um caminho completo."""
+    """Aceita o nome do arquivo em input_guias/ (com ou sem extensão), o número da guia ou um caminho completo."""
+    nome_arquivo = _normalizar_nome_guia(nome_arquivo)
     candidato = Path(nome_arquivo)
     if candidato.is_absolute() or candidato.exists():
         return candidato if candidato.exists() else None
@@ -161,7 +173,7 @@ def extrair_dados_guia(
     lidos, sem correção TUSS. Use para medir a acurácia da extração contra o gabarito.
 
     Args:
-        nome_arquivo: Nome do arquivo da guia (ex: 'Paciente_3.png' ou 'Paciente_3').
+        nome_arquivo: Nome do arquivo da guia (ex: 'guia_003.png', 'guia_003' ou 'guia 3').
         usar_fallback_offline: Se True, usa o motor RapidOCR local em vez do Gemini.
     """
     caminho = _resolver_arquivo_guia(nome_arquivo)
@@ -201,7 +213,7 @@ def processar_guia_medica(
     revisão humana (score < 90%) e salva o JSON canônico que alimenta o Databricks.
 
     Args:
-        nome_arquivo: Nome do arquivo da guia (ex: 'Paciente_2.png' ou 'Paciente_2').
+        nome_arquivo: Nome do arquivo da guia (ex: 'guia_002.png', 'guia_002' ou 'guia 2').
         usar_fallback_offline: Se True, usa o motor RapidOCR local em vez do Gemini.
     """
     caminho = _resolver_arquivo_guia(nome_arquivo)
@@ -301,9 +313,12 @@ REGRAS DE COMPORTAMENTO:
 7. JSON CANÔNICO: só exiba o `json_canonico` se o usuário pedir explicitamente o JSON.
 """.strip()
 
+# Modelo do chat com novas tentativas (tenacity) e troca automática de modelo em caso de falha
+_MODELOS_AGENTE = cadeia_de_modelos()
+
 root_agent = Agent(
     name="agente_extracao_tuss_vidamais",
-    model=os.getenv("GEMINI_MODEL_NAME", "gemini-3.8-flash"),
+    model=GeminiComFallback(model=_MODELOS_AGENTE[0], modelos_reserva=_MODELOS_AGENTE[1:]),
     description="Extração estruturada de guias TISS via modelo multimodal e correção de códigos TUSS via RAG lexical.",
     instruction=INSTRUCOES_AGENTE_VIDAMAIS,
     tools=[

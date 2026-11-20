@@ -24,7 +24,7 @@ try:
         GuiaProcessadaOutput,
         GuiaProcessamentoRequest,
         MetodoCorrecaoTUSS,
-        PacienteLGPDOutput,
+        PacienteOutput,
         ProcedimentoValidadoOutput,
         StatusAuditoriaGuia,
     )
@@ -59,15 +59,16 @@ except ImportError:
             description="Nome da operadora informado opcionalmente na recepção.",
         )
 
-    class PacienteLGPDOutput(BaseModel):
-        """Dados do paciente já anonimizados pela IA na origem (LGPD)."""
+    class PacienteOutput(BaseModel):
+        """Dados do paciente: como lidos pelo OCR e, se localizado, como estão no cadastro."""
 
         paciente_validado_cadastro: bool
         metodo_match_paciente: str
         score_match_paciente: float = Field(..., ge=0.0, le=100.0)
-        nome_paciente_mascarado: str  # Ex: "M**** S**** O*******"
-        carteira_plano_mascarada: str  # Ex: "0032***********01"
-        paciente_hash_sha256: str  # Hash determinístico para cruzamento analítico sem expor PII
+        nome_paciente_ocr_bruto: Optional[str] = None
+        carteira_plano_ocr_bruta: Optional[str] = None
+        nome_paciente_cadastro: Optional[str] = None
+        carteira_plano_cadastro: Optional[str] = None
 
     class ProcedimentoValidadoOutput(BaseModel):
         """Resultado da validação TUSS (comparação Pré-RAG vs Pós-RAG)."""
@@ -103,8 +104,8 @@ except ImportError:
         data_atendimento: Optional[str] = None
         cid10: Optional[str] = None
         carater_atendimento: Optional[str] = None
-        paciente: PacienteLGPDOutput
-        profissional_solicitante_mascarado: Optional[str] = None
+        paciente: PacienteOutput
+        profissional_solicitante: Optional[str] = None
         conselho_profissional: Optional[str] = None
         procedimentos: List[ProcedimentoValidadoOutput]
         total_procedimentos: int
@@ -113,7 +114,7 @@ except ImportError:
         score_medio_guia: float
         motor_ocr_utilizado: str
         latencia_processamento_ms: float
-        versao_pipeline: str = "1.0.0-mvp"
+        versao_pipeline: str = "2.0.0-mvp"
 
 
 # ==============================================================================
@@ -143,8 +144,8 @@ class GuiaRecepcaoResponse(BaseModel):
     registro_ans: Optional[str] = None
     data_atendimento: Optional[str] = None
     paciente_validado_cadastro: bool
-    nome_paciente_mascarado: str
-    carteira_plano_mascarada: str
+    nome_paciente: Optional[str] = None
+    carteira_plano: Optional[str] = None
     status_auditoria_guia: StatusAuditoriaGuia
     total_procedimentos: int
     total_requer_hitl: int

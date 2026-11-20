@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import math
 import os
 import re
@@ -15,7 +14,7 @@ from rapidfuzz import fuzz, process
 
 from ia_ocr_rag.core.schemas import (
     MetodoCorrecaoTUSS,
-    PacienteLGPDOutput,
+    PacienteOutput,
     ProcedimentoOCRRaw,
     ProcedimentoValidadoOutput,
 )
@@ -232,42 +231,79 @@ def remover_zeros_esquerda_excedentes(digitos: str, tamanho: int = 8) -> str:
     return digitos
 
 
-def mascarar_nome_lgpd(nome: Optional[str]) -> str:
-    """Ex.: 'Maria Silva Oliveira' -> 'M**** S**** O*******'."""
-    if not nome or not nome.strip():
-        return "NAO_INFORMADO"
-    partes = nome.strip().split()
-    mascaradas: List[str] = []
-    for p in partes:
-        if len(p) <= 1:
-            mascaradas.append("*")
-        else:
-            mascaradas.append(p[0].upper() + ("*" * (len(p) - 1)))
-    return " ".join(mascaradas)
+# ------------------------------------------------------------------------------
+# Nomes em alfabeto coreano (Hangul) -> alfabeto latino, para comparar com o cadastro
+# ------------------------------------------------------------------------------
+# Cada sílaba Hangul é decomposta deterministicamente em inicial + vogal + final (Unicode),
+# romanizada pela Romanização Revisada e reordenada para "Nome Sobrenome", como no cadastro
+# (ex.: 강민준 -> "Min-jun Kang"). Sobrenomes usam a grafia popular (Kang, Kim, Lee, Park...).
+_HANGUL_INICIAIS = ["g", "kk", "n", "d", "tt", "r", "m", "b", "pp", "s", "ss", "", "j", "jj", "ch", "k", "t", "p", "h"]
+_HANGUL_VOGAIS = ["a", "ae", "ya", "yae", "eo", "e", "yeo", "ye", "o", "wa", "wae", "oe", "yo", "u", "wo", "we", "wi", "yu", "eu", "ui", "i"]
+_HANGUL_FINAIS = ["", "k", "k", "k", "n", "n", "n", "t", "l", "k", "m", "l", "l", "l", "p", "l", "m", "p", "p", "t", "t", "ng", "t", "t", "k", "t", "p", "t"]
+
+SOBRENOMES_COREANOS: Dict[str, str] = {
+    "김": "Kim", "이": "Lee", "박": "Park", "최": "Choi", "정": "Jung", "강": "Kang", "조": "Cho",
+    "윤": "Yoon", "장": "Jang", "임": "Lim", "한": "Han", "오": "Oh", "서": "Seo", "신": "Shin",
+    "권": "Kwon", "황": "Hwang", "안": "Ahn", "송": "Song", "류": "Ryu", "유": "Yoo", "전": "Jeon",
+    "홍": "Hong", "고": "Ko", "문": "Moon", "양": "Yang", "손": "Son", "배": "Bae", "백": "Baek",
+    "허": "Heo", "노": "Noh", "남": "Nam", "심": "Shim", "하": "Ha", "곽": "Kwak", "성": "Sung",
+    "차": "Cha", "주": "Joo", "우": "Woo", "구": "Koo", "민": "Min", "진": "Jin", "나": "Na",
+    "엄": "Um", "원": "Won", "천": "Chun", "방": "Bang", "공": "Kong", "현": "Hyun", "변": "Byun",
+    "황보": "Hwangbo", "남궁": "Namgoong", "선우": "Sunwoo", "제갈": "Jegal",
+}
 
 
-def mascarar_carteira_lgpd(carteira: Optional[str]) -> str:
-    """Ex.: '00320000000000001' (17 dígitos) -> '0032***********01'."""
-    digitos = extrair_apenas_digitos(carteira)
-    if not digitos:
-        return "NAO_INFORMADA"
-    if len(digitos) <= 6:
-        return digitos[0] + ("*" * (len(digitos) - 2)) + digitos[-1]
-    miolo = "*" * (len(digitos) - 6)
-    return f"{digitos[:4]}{miolo}{digitos[-2:]}"
+def contem_hangul(texto: Optional[str]) -> bool:
+    return bool(texto) and any("\uac00" <= c <= "\ud7a3" for c in texto)
 
 
-def gerar_hash_paciente_lgpd(carteira: str, nome: str, salt: str) -> str:
-    """Gera identificador pseudonimizado determinístico para analytics no Databricks sem PII."""
-    chave = f"{salt}|{extrair_apenas_digitos(carteira)}|{normalizar_texto_comparacao(nome)}"
-    return hashlib.sha256(chave.encode("utf-8")).hexdigest()
+def _romanizar_silabas_hangul(texto: str) -> List[str]:
+    silabas: List[str] = []
+    for c in texto:
+        indice = ord(c) - 0xAC00
+        if 0 <= indice <= 11171:
+            inicial, resto = divmod(indice, 21 * 28)
+            vogal, final = divmod(resto, 28)
+            silabas.append(_HANGUL_INICIAIS[inicial] + _HANGUL_VOGAIS[vogal] + _HANGUL_FINAIS[final])
+    return silabas
+
+
+def romanizar_nome_coreano(nome: str) -> str:
+    """Ex.: '강민준' -> 'Min-jun Kang'; '강 태현' -> 'Tae-hyeon Kang'."""
+    partes = nome.split()
+    if len(partes) >= 2:
+        sobrenome_hg, prenome_hg = partes[0], "".join(partes[1:])
+    else:
+        compacto = partes[0] if partes else ""
+        tamanho = 2 if len(compacto) >= 3 and compacto[:2] in SOBRENOMES_COREANOS else 1
+        sobrenome_hg, prenome_hg = compacto[:tamanho], compacto[tamanho:]
+
+    sobrenome = SOBRENOMES_COREANOS.get(sobrenome_hg) or "".join(_romanizar_silabas_hangul(sobrenome_hg)).capitalize()
+    prenome = "-".join(_romanizar_silabas_hangul(prenome_hg)).capitalize()
+    return f"{prenome} {sobrenome}".strip()
+
+
+def chave_fonetica_coreana(nome_latino: str) -> str:
+    """
+    Aproxima as grafias de um mesmo nome coreano em alfabeto latino
+    (ex.: 'Tae-hyeon' x 'Tae-hyun', 'Ji-hun' x 'Ji-hoon', 'Hyeon-u' x 'Hyun-woo', 'Gang' x 'Kang').
+    """
+    tokens = []
+    for token in remover_acentos(nome_latino.lower()).split():
+        t = re.sub(r"[^a-z]", "", token)
+        for antes, depois in (("oo", "u"), ("wu", "u"), ("eo", "u"), ("ee", "i"), ("sh", "s"),
+                              ("k", "g"), ("p", "b"), ("t", "d")):
+            t = t.replace(antes, depois)
+        if t:
+            tokens.append(t)
+    return " ".join(tokens)
 
 
 class LexicalTUSSEngine:
     """
     Motor de RAG Não-Vetorial (Lexical) em memória para:
       1. Correção e padronização de códigos TUSS (Exato + Regra Visual + Fuzzy + BM25).
-      2. Validação cadastral de beneficiários e mascaramento LGPD antes da persistência.
+      2. Validação cadastral de beneficiários (pacientes_simulados.csv).
     """
 
     def __init__(
@@ -275,12 +311,10 @@ class LexicalTUSSEngine:
         tuss_csv_path: str | Path,
         pacientes_csv_path: str | Path,
         hitl_threshold: float = 90.0,
-        lgpd_salt: Optional[str] = None,
     ) -> None:
         self.tuss_csv_path = resolver_caminho_repo(tuss_csv_path)
         self.pacientes_csv_path = resolver_caminho_repo(pacientes_csv_path)
         self.hitl_threshold = float(hitl_threshold)
-        self.lgpd_salt = lgpd_salt or os.getenv("LGPD_HASH_SALT", "clinica_vidamais_mvp_salt_ipnet_2026")
 
         self.tuss_by_id: Dict[str, RegistroTUSS] = {}
         self.tuss_list: List[RegistroTUSS] = []
@@ -599,29 +633,35 @@ class LexicalTUSSEngine:
             motivo_revisao=motivo,
         )
 
-    def validar_e_mascarar_paciente(
+    def validar_paciente(
         self,
         nome_ocr: Optional[str],
         carteira_ocr: Optional[str],
-    ) -> PacienteLGPDOutput:
+    ) -> PacienteOutput:
         """
-        Valida o beneficiário em pacientes_simulados.csv e retorna exclusivamente
-        identificadores mascarados + hash pseudonimizado (LGPD by Design).
+        Valida o beneficiário em pacientes_simulados.csv.
+        Retorna o nome/carteirinha como lidos pelo OCR e, se localizado, os valores do cadastro.
         """
         carteira_norm = normalizar_ruido_optico_numerico(carteira_ocr)
         nome_norm = normalizar_texto_comparacao(nome_ocr or "")
+        # Nome em Hangul: romaniza e compara pela chave fonética com a grafia latina do cadastro
+        nome_coreano = contem_hangul(nome_ocr)
+        if nome_coreano:
+            nome_norm = chave_fonetica_coreana(romanizar_nome_coreano(nome_ocr or ""))
+        lido = dict(
+            nome_paciente_ocr_bruto=(nome_ocr or "").strip() or None,
+            carteira_plano_ocr_bruta=(carteira_ocr or "").strip() or None,
+        )
 
         if len(carteira_norm) == 17 and carteira_norm in self.pacientes_by_carteira:
             pac = self.pacientes_by_carteira[carteira_norm]
-            return PacienteLGPDOutput(
+            return PacienteOutput(
                 paciente_validado_cadastro=True,
                 metodo_match_paciente="EXATO_CARTEIRA",
                 score_match_paciente=100.0,
-                nome_paciente_mascarado=mascarar_nome_lgpd(pac.nome_paciente),
-                carteira_plano_mascarada=mascarar_carteira_lgpd(pac.carteira_do_plano),
-                paciente_hash_sha256=gerar_hash_paciente_lgpd(
-                    pac.carteira_do_plano, pac.nome_paciente, self.lgpd_salt
-                ),
+                nome_paciente_cadastro=pac.nome_paciente,
+                carteira_plano_cadastro=pac.carteira_do_plano,
+                **lido,
             )
 
         melhor_pac: Optional[RegistroPaciente] = None
@@ -629,11 +669,12 @@ class LexicalTUSSEngine:
 
         for pac in self.pacientes_list:
             s_cart = float(fuzz.ratio(carteira_norm, pac.carteira_do_plano)) if carteira_norm else 0.0
-            s_nome = (
-                float(fuzz.token_set_ratio(nome_norm, normalizar_texto_comparacao(pac.nome_paciente)))
-                if nome_norm
-                else 0.0
-            )
+            if not nome_norm:
+                s_nome = 0.0
+            elif nome_coreano:
+                s_nome = float(fuzz.token_sort_ratio(nome_norm, chave_fonetica_coreana(pac.nome_paciente)))
+            else:
+                s_nome = float(fuzz.token_set_ratio(nome_norm, normalizar_texto_comparacao(pac.nome_paciente)))
             if carteira_norm and nome_norm:
                 s_comb = 0.65 * s_cart + 0.35 * s_nome
             elif carteira_norm:
@@ -646,26 +687,20 @@ class LexicalTUSSEngine:
                 melhor_pac = pac
 
         if melhor_pac is not None and melhor_score >= 85.0:
-            return PacienteLGPDOutput(
+            return PacienteOutput(
                 paciente_validado_cadastro=True,
                 metodo_match_paciente="FUZZY_CARTEIRA_NOME",
                 score_match_paciente=round(melhor_score, 2),
-                nome_paciente_mascarado=mascarar_nome_lgpd(melhor_pac.nome_paciente),
-                carteira_plano_mascarada=mascarar_carteira_lgpd(melhor_pac.carteira_do_plano),
-                paciente_hash_sha256=gerar_hash_paciente_lgpd(
-                    melhor_pac.carteira_do_plano, melhor_pac.nome_paciente, self.lgpd_salt
-                ),
+                nome_paciente_cadastro=melhor_pac.nome_paciente,
+                carteira_plano_cadastro=melhor_pac.carteira_do_plano,
+                **lido,
             )
 
-        return PacienteLGPDOutput(
+        return PacienteOutput(
             paciente_validado_cadastro=False,
             metodo_match_paciente="NAO_LOCALIZADO",
             score_match_paciente=round(melhor_score, 2),
-            nome_paciente_mascarado=mascarar_nome_lgpd(nome_ocr),
-            carteira_plano_mascarada=mascarar_carteira_lgpd(carteira_norm or carteira_ocr),
-            paciente_hash_sha256=gerar_hash_paciente_lgpd(
-                carteira_norm or "", nome_ocr or "", self.lgpd_salt
-            ),
+            **lido,
         )
 
     def consultar_top_candidatos(self, termo_ou_codigo: str, top_k: int = 5) -> List[Tuple[str, str, float]]:
@@ -749,6 +784,6 @@ if __name__ == "__main__":
         print(res.model_dump_json(indent=2))
 
     if args.carteira or args.paciente:
-        pac_res = engine.validar_e_mascarar_paciente(args.paciente, args.carteira)
-        print("\nResultado da Validação & Mascaramento LGPD:")
+        pac_res = engine.validar_paciente(args.paciente, args.carteira)
+        print("\nResultado da Validação do Paciente:")
         print(pac_res.model_dump_json(indent=2))

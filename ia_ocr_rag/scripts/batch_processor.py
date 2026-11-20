@@ -21,7 +21,7 @@ from ia_ocr_rag.core.schemas import GuiaProcessadaOutput, GuiaProcessamentoReque
 
 load_dotenv(REPO_ROOT / ".env")
 
-EXTENSOES_IMAGEM = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
+EXTENSOES_IMAGEM = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".pdf"}
 
 UNIDADES_CLINICA_VIDAMAIS = [
     "UNIDADE_01_MATRIZ",
