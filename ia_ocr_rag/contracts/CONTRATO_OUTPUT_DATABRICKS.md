@@ -125,34 +125,85 @@ silver_procedimentos = (
 
 ## 4. Métricas Pré-RAG × Pós-RAG — regras combinadas
 
-- **Pré-RAG:** `codigo_tuss_ocr_bruto` comparado **literalmente** com o código do gabarito. Pela regra de fidelidade óptica, o OCR não corrige nada; é essa a medida honesta da leitura bruta. Exemplo: `0040302733` contra `40302733` conta como erro no Pré-RAG.
-- **Pós-RAG:** `codigo_tuss_corrigido` comparado com o código do gabarito. Item com `codigo_tuss_corrigido = null` conta como erro.
-- **Itens sem código na guia** (`codigo_tuss_ocr_bruto = ""`): o código é sugerido pelo RAG só pela descrição e **sempre** vai para revisão humana (score máximo 88). No Pré-RAG contam como erro; vale separá-los no dashboard (`codigo_tuss_ocr_bruto = ''`), porque medem a busca por descrição e não a leitura do OCR.
+> **Atenção:** acurácia só se mede onde o gabarito tem a resposta. Os 38 itens das guias 007 e 012
+> não têm código no gabarito (a guia lista só a descrição); neles o RAG **sugere** um código pela
+> descrição, para o faturamento, e manda o item para revisão humana. Compará-los com o gabarito vazio
+> conta 38 "erros" que não são erros e derruba o Pós-RAG para ~61%. Eles entram num indicador à parte.
+
+- **Pré-RAG:** `codigo_tuss_ocr_bruto` comparado **literalmente** com o código do gabarito. Pela regra de fidelidade óptica, o OCR não corrige nada; é essa a medida honesta da leitura bruta.
+- **Pós-RAG:** `codigo_tuss_corrigido` comparado com o código do gabarito **normalizado para 8 dígitos** (`0040302733` → `40302733`, guia_002). Item com `codigo_tuss_corrigido = null` conta como erro.
+- **Denominador das duas acurácias:** só itens com código no gabarito (59 no lote atual), incluindo os que o OCR perdeu (contam como erro). Ficam fora:
+  - `SO_DESCRICAO`: item sem código no gabarito (guias 007 e 012, 38 itens). Na saída aparecem com `codigo_tuss_ocr_bruto = ""`, `metodo_correcao = FUZZY_BM25` e `requer_revisao_humana = true` (score máximo 88). O indicador deles é "código sugerido e enviado para revisão", não acurácia.
+  - `INVENTADO_PELO_OCR`: item do lote que não existe no gabarito (1 no lote atual, guia_003). Entra na precisão da extração, não na acurácia do código.
+- **Carteirinha:** mesmo padrão lido × corrigido. `carteira_plano_ocr_bruta` é o que o OCR leu (mede a extração); `carteira_plano_cadastro` vem do `pacientes_simulados.csv` depois do match (é a chave do paciente para o negócio). Quando o OCR não leu a carteirinha, o paciente é localizado pelo nome e `metodo_match_paciente = FUZZY_CARTEIRA_NOME`: a carteirinha veio do cadastro, não da imagem. Para medir o OCR use só `carteira_plano_ocr_bruta`.
 - **Gabarito** (`ia_ocr_rag/data/gabarito/gabarito.csv`, separador `;`):
-  `id_guia;item;nome;carteirinha;codigo_tuss;descricao` (97 linhas, 1 por procedimento).
+  `id_guia;item;nome;carteirinha;codigo_tuss;descricao` (97 linhas, 1 por procedimento). Leia **sem** `inferSchema`, para não perder os zeros à esquerda.
 - **Chave da guia:** o arquivo tem o mesmo nome do `id_guia` (`guia_006.png` ↔ `guia_006`).
 - **Chave do item:** `sequencial_item` ↔ `item`. Só bate se o OCR ler os mesmos itens na mesma ordem;
-  se o OCR pular ou inventar um item, a numeração desalinha. Use `FULL OUTER JOIN` e conte à parte os
-  itens que só existem de um lado (perdidos ou inventados pelo OCR).
-- **Códigos com zeros à esquerda:** o gabarito traz o código como impresso (ex.: `0040302733`, guia_002).
-  No Pré-RAG compare literal; no Pós-RAG normalize o gabarito para 8 dígitos.
-- **Guias 007 e 012:** o gabarito não tem código (a guia lista só descrições), então ficam fora do Pós-RAG.
+  por isso o `FULL OUTER JOIN` e a coluna `tipo_item`.
 - **Descrição:** compare `descricao` do gabarito com `descricao_ocr_bruta` (texto como impresso), não com a oficial.
 
+Testado em PySpark 3.5 com o `lote_12_guias.jsonl` atual (`silver_procedimentos` = `procedimentos` explodido, com `arquivo_origem`):
+
 ```python
-gabarito = (spark.read.option("header", True).option("sep", ";").csv("<caminho>/gabarito.csv")
+from pyspark.sql import functions as F
+
+gabarito = (
+    spark.read.option("header", True).option("sep", ";").csv("<caminho>/gabarito.csv")  # sem inferSchema
+    .withColumn("item", F.col("item").cast("long"))
     .withColumn("codigo_gabarito_8d",
         F.when((F.length("codigo_tuss") > 8) & F.col("codigo_tuss").startswith("00"),
-               F.substring("codigo_tuss", -8, 8)).otherwise(F.col("codigo_tuss"))))
+               F.substring("codigo_tuss", -8, 8)).otherwise(F.col("codigo_tuss")))
+)
 
 comparacao = (
     silver_procedimentos
-    .withColumn("id_guia", F.regexp_replace("arquivo_origem", r"\.[A-Za-z]+$", ""))
-    .join(gabarito, (F.col("id_guia") == gabarito.id_guia) & (F.col("sequencial_item") == gabarito.item.cast("long")), "full_outer")
-    .withColumn("acerto_pre_rag", F.col("codigo_tuss_ocr_bruto") == F.col("codigo_tuss"))
-    .withColumn("acerto_pos_rag", F.col("codigo_tuss_corrigido") == F.col("codigo_gabarito_8d"))
+    .withColumn("id_guia", F.regexp_replace("arquivo_origem", r"\.[A-Za-z]+$", "")).alias("p")
+    .join(gabarito.alias("g"),
+          (F.col("p.id_guia") == F.col("g.id_guia")) & (F.col("p.sequencial_item") == F.col("g.item")),
+          "full_outer")
+    .select(
+        F.coalesce("p.id_guia", "g.id_guia").alias("id_guia"),
+        F.coalesce("p.sequencial_item", "g.item").alias("item"),
+        "p.codigo_tuss_ocr_bruto", "p.codigo_tuss_corrigido", "p.requer_revisao_humana",
+        F.col("g.codigo_tuss").alias("codigo_gabarito"), "g.codigo_gabarito_8d",
+        F.when(F.col("g.id_guia").isNull(), "INVENTADO_PELO_OCR")
+         .when(F.col("p.id_guia").isNull(), "PERDIDO_PELO_OCR")
+         .when(F.coalesce(F.col("g.codigo_tuss"), F.lit("")) == "", "SO_DESCRICAO")
+         .otherwise("COM_CODIGO").alias("tipo_item"),
+    )
+    .withColumn("acerto_pre_rag", F.coalesce(F.col("codigo_tuss_ocr_bruto") == F.col("codigo_gabarito"), F.lit(False)))
+    .withColumn("acerto_pos_rag", F.coalesce(F.col("codigo_tuss_corrigido") == F.col("codigo_gabarito_8d"), F.lit(False)))
+)
+
+# Acurácia: só itens com código no gabarito
+acuracia = (
+    comparacao.filter(F.col("tipo_item").isin("COM_CODIGO", "PERDIDO_PELO_OCR"))
+    .agg(F.count("*").alias("itens"),
+         F.sum(F.col("acerto_pre_rag").cast("int")).alias("acertos_pre_rag"),
+         F.sum(F.col("acerto_pos_rag").cast("int")).alias("acertos_pos_rag"))
+    .withColumn("acuracia_pre_rag_pct", F.round(F.col("acertos_pre_rag") / F.col("itens") * 100, 1))
+    .withColumn("acuracia_pos_rag_pct", F.round(F.col("acertos_pos_rag") / F.col("itens") * 100, 1))
+)
+
+# Itens só com descrição: código sugerido pelo RAG, sempre em revisão humana
+sugestoes = (
+    comparacao.filter(F.col("tipo_item") == "SO_DESCRICAO")
+    .agg(F.count("*").alias("itens_so_descricao"),
+         F.sum(F.col("codigo_tuss_corrigido").isNotNull().cast("int")).alias("com_codigo_sugerido"),
+         F.sum(F.col("requer_revisao_humana").cast("int")).alias("em_revisao_humana"))
 )
 ```
+
+Resultado esperado no lote atual (serve de conferência):
+
+| Indicador | Valor |
+|---|---|
+| Itens com código no gabarito | 59 |
+| Pré-RAG | 56/59 = 94,9% |
+| Pós-RAG | 59/59 = 100,0% |
+| Itens só com descrição (`SO_DESCRICAO`) | 38, todos com código sugerido e todos em revisão humana |
+| Itens inventados pelo OCR | 1 (guia_003) |
 
 A avaliação de referência da frente de IA (`python ia_ocr_rag/scripts/avaliar_gabarito.py`) alinha os
 itens por similaridade, respeitando a ordem, e serve para conferir os números do dashboard.
